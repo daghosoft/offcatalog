@@ -173,3 +173,15 @@ def test_controlli_falliti_lasciano_il_catalogo_pubblicato(env, make_cfg, source
     assert [x["ok"] for x in run["controlli"]][0] is False
     assert cfg.output_db.read_bytes() == before
     assert not (cfg.output_dir / "off_catalog.db.tmp").exists()
+
+
+def test_panel_data_tz(env, monkeypatch):
+    cfg, app, src = env
+    p = TestClient(app, client=("198.51.100.1", 1))
+    a = ("admin", "changeme")
+    monkeypatch.setenv("TZ", "Europe/Rome")
+    assert p.get("/panel/data", auth=a).json()["tz"] == "Europe/Rome"
+    monkeypatch.setenv("TZ", "Non/Valido")
+    assert p.get("/panel/data", auth=a).json()["tz"] == "UTC"
+    monkeypatch.delenv("TZ")
+    assert p.get("/panel/data", auth=a).json()["tz"] == "UTC"

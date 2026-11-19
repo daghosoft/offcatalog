@@ -4,7 +4,9 @@ from __future__ import annotations
 import base64
 import binascii
 import ipaddress
+import os
 import secrets
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -13,6 +15,16 @@ from . import __version__
 from .config import Config
 from .manager import Manager, iso
 from .panel import PANEL_HTML, SETTINGS_HTML, SETTINGS_LOCKED_HTML
+
+def server_tz() -> str:
+    """Nome IANA del fuso del server (variabile TZ); UTC se assente o non valido."""
+    name = os.environ.get("TZ") or ""
+    try:
+        ZoneInfo(name)
+        return name
+    except Exception:
+        return "UTC"
+
 
 STATUS_CODE = {"avviata": 202, "nessuna_novita": 200, "gia_in_corso": 409, "interrotta": 409}
 
@@ -114,7 +126,7 @@ def create_app(cfg: Config | None = None, manager: Manager | None = None) -> Fas
         log = []
         if last:
             log = [{"ts": iso(r["ts"]), "line": r["line"]} for r in mgr.st.log_tail(last["run_id"], 60)]
-        return {"versione": __version__, "stato": status, "storico": mgr.history_view(20), "log": log}
+        return {"versione": __version__, "tz": server_tz(), "stato": status, "storico": mgr.history_view(20), "log": log}
 
     @app.get("/settings", response_class=HTMLResponse)
     def settings_page(request: Request):
