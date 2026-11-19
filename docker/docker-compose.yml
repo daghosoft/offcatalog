@@ -1,0 +1,26 @@
+# Avvio: ./run.sh (legge .env.local, vedi .env.example). Nessun nome, percorso o segreto scritto qui.
+services:
+  offcatalog:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        OFFCAT_UID: ${OFFCAT_UID:-1000}
+        OFFCAT_GID: ${OFFCAT_GID:-1000}
+    container_name: ${OFFCAT_CONTAINER_NAME:-offcatalog}
+    restart: unless-stopped
+    ports:
+      - "${OFFCAT_BIND:-127.0.0.1}:${OFFCAT_PORT:-8080}:8000"
+    environment:
+      TZ: ${TZ:-UTC}
+      OFFCAT_PANEL_USER: ${OFFCAT_PANEL_USER:-}
+      OFFCAT_PANEL_PASSWORD: ${OFFCAT_PANEL_PASSWORD:-}
+      OFFCAT_NO_AUTH: ${OFFCAT_NO_AUTH:-0}
+      OFFCAT_API_ALLOW: ${OFFCAT_API_ALLOW:-127.0.0.1,172.16.0.0/12}
+      OFFCAT_COUNTRIES: ${OFFCAT_COUNTRIES:-en:italy}
+      OFFCAT_MIN_PRODUCTS: ${OFFCAT_MIN_PRODUCTS:-100000}
+      OFFCAT_SOURCE_URL: ${OFFCAT_SOURCE_URL:-https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz}
+      OFFCAT_KEEP_WORK: ${OFFCAT_KEEP_WORK:-0}
+    volumes:
+      - ${OFFCAT_WORK_HOST_DIR:?impostare OFFCAT_WORK_HOST_DIR}:/data/work
+      - ${OFFCAT_OUTPUT_HOST_DIR:?impostare OFFCAT_OUTPUT_HOST_DIR}:/data/output
