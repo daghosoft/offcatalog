@@ -62,6 +62,12 @@ Solo variabili d'ambiente; l'elenco commentato e' in `docker/.env.example`. Ness
 3. `OFFCAT_API_ALLOW`: indirizzi ammessi alle API (default `127.0.0.1` e `172.16.0.0/12`).
 4. `OFFCAT_COUNTRIES` (default `en:italy`), `OFFCAT_MIN_PRODUCTS` (default 100000), `OFFCAT_SOURCE_URL`,
    `OFFCAT_KEEP_WORK`, `OFFCAT_PORT`, `OFFCAT_BIND`, `COMPOSE_PROJECT_NAME`, `OFFCAT_CONTAINER_NAME`, `TZ`.
+5. `OFFCAT_SUBNET` (default `172.31.250.0/24`) e `OFFCAT_IP` (default `172.31.250.5`): rete Docker dedicata
+   (`offcatalog_net`) e IP fisso del container, utile per regole firewall verso il container. L'IP deve essere
+   dentro la subnet. Cambiare rete a un container esistente richiede di ricrearlo (`docker compose down`, poi `up`).
+   Le chiamate dall'host alla porta pubblicata arrivano dal gateway della rete dedicata: con una subnet dentro
+   `172.16.0.0/12` sono coperte dal default di `OFFCAT_API_ALLOW`. Con una subnet fuori da quel range, aggiungerla
+   a `OFFCAT_API_ALLOW`.
 
 Il pannello e le API sono in HTTP semplice: la password Basic viaggia in chiaro. Non esporre la porta al mondo:
 limitarla con il firewall agli indirizzi di chi gestisce il servizio.
