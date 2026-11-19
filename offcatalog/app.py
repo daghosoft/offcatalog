@@ -114,7 +114,40 @@ def create_app(cfg: Config | None = None, manager: Manager | None = None) -> Fas
         log = []
         if last:
             log = [{"ts": iso(r["ts"]), "line": r["line"]} for r in mgr.st.log_tail(last["run_id"], 60)]
-        return {"versione": __version__, "stato": status, "storico": mgr.history_view(20), "log": log}
+        locked, why = mgr.settings_lock()
+        return {"versione": __version__, "stato": status, "storico": mgr.history_view(20), "log": log,
+                "impostazioni_blocco": {"bloccato": locked, "motivo": why}}
+
+    @app.get("/panel/settings")
+    def panel_settings(request: Request):
+        if not panel_ok(request):
+            return unauthorized()
+        return mgr.settings_view()
+
+    @app.post("/panel/settings")
+    async def panel_settings_save(request: Request):
+        if not panel_ok(request):
+            return unauthorized()
+        if request.headers.get("x-requested-with") != "panel":
+            return JSONResponse({"errore": "intestazione mancante"}, status_code=403)
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        if not isinstance(body, dict) or not body:
+            return JSONResponse({"errore": "corpo non valido: atteso un oggetto JSON con i campi da salvare"},
+                                status_code=400)
+        code, out = mgr.save_settings(body)
+        return JSONResponse(out, status_code=code)
+
+    @app.post("/panel/settings/reset/{key}")
+    def panel_settings_reset(request: Request, key: str):
+        if not panel_ok(request):
+            return unauthorized()
+        if request.headers.get("x-requested-with") != "panel":
+            return JSONResponse({"errore": "intestazione mancante"}, status_code=403)
+        code, out = mgr.reset_setting(key)
+        return JSONResponse(out, status_code=code)
 
     @app.post("/panel/cmd/{name}")
     def panel_cmd(request: Request, name: str):

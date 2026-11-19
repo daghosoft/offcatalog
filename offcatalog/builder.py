@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timezone
 
 from . import ATTRIBUTION, SCHEMA_VERSION, __version__
+from .settings import META_KEYS, to_text
 from .config import Config
 from .filters import REASONS, RowFilter
 
@@ -189,6 +190,7 @@ def index(cfg: Config, src: dict, ctl) -> None:
         offcatalog_version=__version__,
         attribution=ATTRIBUTION,
         license="ODbL 1.0",
+        **{f"setting_{k}": to_text(k, getattr(cfg, k)) for k in META_KEYS},
     )
     conn.commit()
     conn.execute("ANALYZE")

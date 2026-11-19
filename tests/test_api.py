@@ -12,7 +12,7 @@ OUTSIDE = ("203.0.113.9", 50000)
 RUN_KEYS = {"run_id", "stato", "origine", "forzata", "fase", "percentuale", "inizio", "fine", "durata_s",
             "stima_secondi_rimanenti", "fasi", "byte_scaricati", "byte_totali", "velocita_bps", "csv_bytes",
             "righe_lette", "prodotti_tenuti", "scarti", "doppioni", "catalogo_bytes", "controlli", "pubblicato",
-            "percorso_uscita", "errore", "sorgente", "link"}
+            "percorso_uscita", "errore", "sorgente", "link", "settings"}
 
 
 @pytest.fixture

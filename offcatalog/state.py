@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS log (
 );
 CREATE INDEX IF NOT EXISTS log_run ON log(run_id, id);
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at REAL NOT NULL);
 """
 
 # stati
@@ -205,6 +206,25 @@ class State:
                 "INSERT INTO kv(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (key, json.dumps(value)),
             )
+
+    # ---- impostazioni modificate dal pannello (override di env/default)
+    def settings_get(self) -> dict:
+        with self._c() as c:
+            return {r["key"]: r["value"] for r in c.execute("SELECT key, value FROM settings")}
+
+    def settings_set(self, values: dict):
+        now = time.time()
+        with self._c() as c:
+            for k, v in values.items():
+                c.execute(
+                    "INSERT INTO settings(key,value,updated_at) VALUES (?,?,?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+                    (k, v, now),
+                )
+
+    def settings_delete(self, key: str):
+        with self._c() as c:
+            c.execute("DELETE FROM settings WHERE key=?", (key,))
 
     def mark_orphans_interrupted(self) -> int:
         """Esecuzioni rimaste 'in corso' senza processo (riavvio): le segna 'interrotta'."""

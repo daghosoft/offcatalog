@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import builder, source
+from . import builder, settings as sett, source
 from .config import Config
 from .state import (COMPLETATA, ERRORE, IN_CORSO, INTERROTTA, NESSUNA_NOVITA, State)
 
@@ -76,9 +76,77 @@ class Manager:
                 if self.st.get_run(run["id"])["status"] == IN_CORSO:
                     self.st.set_status(run["id"], INTERROTTA, error="processo di sync terminato")
 
+    # ---- impostazioni modificabili dal pannello
+    def effective_cfg(self) -> Config:
+        """Config effettiva: valore salvato dal pannello > variabile d'ambiente > default."""
+        return sett.apply_overrides(self.cfg, self.st.settings_get())
+
+    def settings_lock(self) -> tuple[bool, str | None]:
+        """(bloccato, motivo): le impostazioni non si cambiano con una sync in corso o interrotta."""
+        with self.mu:
+            self.reconcile()
+            active = self.st.active_run()
+            if active:
+                return True, ("in_corso" if active["status"] == IN_CORSO else "interrotta")
+            return False, None
+
+    def settings_view(self) -> dict:
+        locked, why = self.settings_lock()
+        stored = self.st.settings_get()
+        eff = self.effective_cfg()
+        fields = []
+        for k, meta in sett.FIELDS.items():
+            v, d = getattr(eff, k), getattr(self.cfg, k)
+            fields.append({
+                "chiave": k, "tipo": meta["tipo"], "etichetta": meta["etichetta"],
+                "descrizione": meta["descrizione"],
+                "valore": ",".join(v) if k == "countries" else v,
+                "default": ",".join(d) if k == "countries" else d,
+                "sovrascritto": k in stored,
+            })
+        return {"bloccato": locked, "motivo": why, "campi": fields}
+
+    def save_settings(self, body: dict) -> tuple[int, dict]:
+        """Salva i campi indicati. Esiti: (200, vista) | (409, ...) | (422, errori per campo)."""
+        with self.mu:
+            locked, why = self.settings_lock()
+            if locked:
+                return 409, {"errore": self._lock_message(why), "motivo": why}
+            parsed, errs = {}, {}
+            for k, raw in body.items():
+                try:
+                    parsed[k] = sett.parse_value(k, raw)
+                except ValueError as e:
+                    errs[k] = str(e)
+            if not errs:
+                merged = {**sett.values_of(self.effective_cfg()), **parsed}
+                errs.update(sett.cross_check(merged))
+            if errs:
+                return 422, {"errore": "valori non validi", "campi": errs}
+            self.st.settings_set({k: sett.to_text(k, v) for k, v in parsed.items()})
+            return 200, self.settings_view()
+
+    def reset_setting(self, key: str) -> tuple[int, dict]:
+        with self.mu:
+            if key not in sett.FIELDS:
+                return 404, {"errore": "impostazione sconosciuta"}
+            locked, why = self.settings_lock()
+            if locked:
+                return 409, {"errore": self._lock_message(why), "motivo": why}
+            self.st.settings_delete(key)
+            return 200, self.settings_view()
+
+    @staticmethod
+    def _lock_message(why: str | None) -> str:
+        if why == "interrotta":
+            return "Sync interrotta: annullala per cambiare i filtri."
+        return "Sync in corso: le impostazioni non si possono cambiare."
+
     def _spawn(self, run_id: int):
         self.cfg.work_dir.mkdir(parents=True, exist_ok=True)
-        env = {**os.environ, **self.cfg.to_env()}
+        eff = self.effective_cfg()
+        self.st.update_progress(run_id, settings=sett.effective_dict(eff))
+        env = {**os.environ, **eff.to_env()}
         root = str(Path(__file__).resolve().parent.parent)
         log = open(self.cfg.work_dir / "worker.log", "ab")
         self._proc = subprocess.Popen(
@@ -207,6 +275,7 @@ class Manager:
             "doppioni": scarti["doppione"] if scarti else None,
             "catalogo_bytes": prog.get("catalog_bytes"),
             "controlli": controls or None,
+            "settings": prog.get("settings"),
             "pubblicato": bool(r["published"]),
             "percorso_uscita": r["output_path"],
             "errore": r["error"],

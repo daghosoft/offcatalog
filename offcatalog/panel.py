@@ -35,6 +35,15 @@ table{border-collapse:collapse;width:100%}
 td,th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--row);font-size:13px;vertical-align:top}
 th{color:var(--muted);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
 #run td.k{color:var(--muted);white-space:nowrap}
+#set .campo{padding:8px 0;border-bottom:1px solid var(--row)}
+#set label{font-weight:600;display:block}
+#set input[type=text],#set input[type=number]{font:inherit;padding:5px 8px;min-height:32px;width:100%;max-width:340px;box-sizing:border-box;border:1px solid var(--btn-border);border-radius:6px;background:var(--surface);color:var(--text)}
+#set input:disabled{opacity:.6}
+#set .info{color:var(--muted);font-size:12px;margin-top:2px}
+#set .ov{color:var(--note);font-weight:600}
+#set .errc{color:var(--err);font-size:12px}
+#set button{min-height:30px;padding:3px 10px;margin:4px 8px 0 0;font-size:12px}
+#setnote{color:var(--note);font-size:13px;margin-bottom:6px}
 #hist{overflow-x:auto}
 #hist td,#hist th{white-space:nowrap}
 #hist td:last-child{white-space:normal}
@@ -60,6 +69,8 @@ pre{background:var(--pre-bg);color:var(--pre-text);padding:10px 12px;border-radi
 <button data-cmd="avvia">Avvia</button><button data-cmd="forza">Forza</button>
 <button data-cmd="interrompi">Interrompi</button><button data-cmd="riprendi">Riprendi</button>
 <button data-cmd="riparti">Riparti da zero</button><div id="msg" aria-live="polite"></div></section>
+<section><h2>Impostazioni</h2><div id="setnote" aria-live="polite"></div><div id="set"></div>
+<button id="setsave">Salva</button><span id="setmsg" class="k" aria-live="polite"></span></section>
 <section><h2>Esecuzione</h2><div id="run"></div></section>
 <section><h2>Registro</h2><pre id="log" tabindex="0"></pre></section>
 <section><h2>Storico (ultime 20)</h2><div id="hist"></div></section>
@@ -79,7 +90,58 @@ async function cmd(name){
   refresh();
 }
 document.querySelectorAll('button[data-cmd]').forEach(b=>b.onclick=()=>cmd(b.dataset.cmd));
+const HDR={'Content-Type':'application/json','X-Requested-With':'panel'};
+let setLocked=false;
+function setApplyLock(b){
+  setLocked=!!(b&&b.bloccato);
+  $('setnote').textContent=!setLocked?'':(b.motivo==='interrotta'?'Sync interrotta: annullala per cambiare i filtri.':'Sync in corso: impostazioni in sola lettura.');
+  document.querySelectorAll('#set input,#set button,#setsave').forEach(e=>e.disabled=setLocked);
+}
+function setRender(v){
+  $('set').innerHTML=v.campi.map(f=>{
+    const val=f.tipo==='bool'?'':esc(f.valore), dflt=f.tipo==='bool'?(f.default?'si':'no'):esc(f.default);
+    const inp=f.tipo==='bool'?'<input type="checkbox" id="s_'+f.chiave+'"'+(f.valore?' checked':'')+'>'
+      :'<input type="'+(f.tipo==='testo'?'text':'number')+'" step="any" id="s_'+f.chiave+'" value="'+val+'">';
+    return '<div class="campo"><label for="s_'+f.chiave+'">'+esc(f.etichetta)+'</label>'+inp
+      +'<div class="info">'+esc(f.descrizione)+'</div>'
+      +'<div class="info">Valore di partenza: <b>'+dflt+'</b> &middot; '+(f.sovrascritto?'<span class="ov">modificato dal pannello</span>':'nessuna modifica')+'</div>'
+      +'<div class="errc" id="e_'+f.chiave+'"></div>'
+      +(f.sovrascritto?'<button data-reset="'+f.chiave+'">Ripristina</button>':'')+'</div>';
+  }).join('');
+  document.querySelectorAll('button[data-reset]').forEach(b=>b.onclick=()=>setReset(b.dataset.reset));
+  v.campi.forEach(f=>{f._cur=f.valore});window._setFields=v.campi;
+  setApplyLock(v);
+}
+async function setLoad(){
+  try{const r=await fetch('/panel/settings');if(r.ok)setRender(await r.json())}catch(e){}
+}
+async function setSave(){
+  const body={};
+  (window._setFields||[]).forEach(f=>{
+    const el=$('s_'+f.chiave);if(!el)return;
+    const cur=f.tipo==='bool'?el.checked:el.value;
+    if(String(cur)!==String(f._cur))body[f.chiave]=cur;
+    $('e_'+f.chiave).textContent='';
+  });
+  if(!Object.keys(body).length){$('setmsg').textContent='Nessuna modifica.';return}
+  const r=await fetch('/panel/settings',{method:'POST',headers:HDR,body:JSON.stringify(body)});
+  const j=await r.json();
+  if(r.ok){$('setmsg').textContent='Salvato.';setRender(j)}
+  else{$('setmsg').textContent=j.errore||'errore';
+    Object.entries(j.campi||{}).forEach(([k,m])=>{const e=$('e_'+k);if(e)e.textContent=m});}
+}
+async function setReset(key){
+  const r=await fetch('/panel/settings/reset/'+key,{method:'POST',headers:HDR});
+  const j=await r.json();
+  if(r.ok){$('setmsg').textContent='Ripristinato.';setRender(j)}else $('setmsg').textContent=j.errore||'errore';
+}
+$('setsave').onclick=setSave;
+let lastLock=null;
 function render(d){
+  const lk=d.impostazioni_blocco;
+  const lkey=lk.bloccato+'/'+lk.motivo;
+  if(lkey!==lastLock){lastLock=lkey;if(window._setFields)setApplyLock(lk);}
+  if(!window._setFields)setLoad();
   const s=d.stato,p=s.catalogo_pubblicato,r=s.esecuzione,a=s.ultima_chiamata_api;
   $('ver').textContent='v'+d.versione;
   $('pub').innerHTML=p.data?('Data: '+esc(p.data)+' &middot; prodotti: '+num(p.prodotti)+' &middot; dimensione: '+mb(p.dimensione)
