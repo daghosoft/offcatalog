@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from offcatalog.app import create_app
 from offcatalog.config import Config
-from offcatalog.state import ERRORE, INTERROTTA
+from offcatalog.state import INTERROTTA
 
 from test_api import LOCAL, wait_done
 
@@ -92,29 +92,30 @@ def test_corpo_e_autenticazione(env):
     assert c.post("/panel/settings/reset/boh", headers=H, auth=AUTH).status_code == 404
 
 
-def test_blocco_sync_in_corso(env):
+def test_blocco_solo_con_sync_in_corso(env):
     cfg, app, c = env
     mgr = app.state.manager
+    assert "Torna al pannello" in c.get("/settings", auth=AUTH).text and 'id="setsave"' in c.get("/settings", auth=AUTH).text
+    assert c.get("/settings").status_code == 401
     mgr.st.create_run("pannello", False)                   # "in corso" (nessun processo: lo teniamo vivo col lock)
     mgr._spawn_ts = __import__("time").time()
     r = post(c, {"kcal_min": 5})
     assert r.status_code == 409 and "in corso" in r.json()["errore"]
     assert c.post("/panel/settings/reset/kcal_min", headers=H, auth=AUTH).status_code == 409
-    v = c.get("/panel/settings", auth=AUTH).json()
-    assert v["bloccato"] is True and v["motivo"] == "in_corso"
-    assert c.get("/panel/data", auth=AUTH).json()["impostazioni_blocco"] == {"bloccato": True, "motivo": "in_corso"}
+    page = c.get("/settings", auth=AUTH).text
+    assert "Sync in corso: impostazioni non disponibili" in page and "Torna al pannello" in page
+    assert 'id="setsave"' not in page
+    assert "impostazioni_blocco" not in c.get("/panel/data", auth=AUTH).json()
 
 
-def test_blocco_sync_interrotta_poi_sblocco(env):
+def test_sync_interrotta_non_blocca(env):
     cfg, app, c = env
     mgr = app.state.manager
     rid = mgr.st.create_run("pannello", False)
     mgr.st.set_status(rid, INTERROTTA)
-    r = post(c, {"kcal_min": 5})
-    assert r.status_code == 409 and "interrotta" in r.json()["errore"].lower()
-    assert c.get("/panel/settings", auth=AUTH).json()["motivo"] == "interrotta"
-    mgr.st.set_status(rid, ERRORE, error="x")             # chiusa: non blocca piu'
     assert post(c, {"kcal_min": 5}).status_code == 200
+    assert c.post("/panel/settings/reset/kcal_min", headers=H, auth=AUTH).status_code == 200
+    assert 'id="setsave"' in c.get("/settings", auth=AUTH).text
 
 
 def test_settings_nel_run_e_nel_meta(env):

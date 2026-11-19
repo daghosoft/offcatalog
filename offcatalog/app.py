@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from . import __version__
 from .config import Config
 from .manager import Manager, iso
-from .panel import PANEL_HTML
+from .panel import PANEL_HTML, SETTINGS_HTML, SETTINGS_LOCKED_HTML
 
 STATUS_CODE = {"avviata": 202, "nessuna_novita": 200, "gia_in_corso": 409, "interrotta": 409}
 
@@ -114,9 +114,13 @@ def create_app(cfg: Config | None = None, manager: Manager | None = None) -> Fas
         log = []
         if last:
             log = [{"ts": iso(r["ts"]), "line": r["line"]} for r in mgr.st.log_tail(last["run_id"], 60)]
-        locked, why = mgr.settings_lock()
-        return {"versione": __version__, "stato": status, "storico": mgr.history_view(20), "log": log,
-                "impostazioni_blocco": {"bloccato": locked, "motivo": why}}
+        return {"versione": __version__, "stato": status, "storico": mgr.history_view(20), "log": log}
+
+    @app.get("/settings", response_class=HTMLResponse)
+    def settings_page(request: Request):
+        if not panel_ok(request):
+            return unauthorized()
+        return HTMLResponse(SETTINGS_LOCKED_HTML if mgr.settings_locked() else SETTINGS_HTML)
 
     @app.get("/panel/settings")
     def panel_settings(request: Request):

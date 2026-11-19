@@ -81,17 +81,14 @@ class Manager:
         """Config effettiva: valore salvato dal pannello > variabile d'ambiente > default."""
         return sett.apply_overrides(self.cfg, self.st.settings_get())
 
-    def settings_lock(self) -> tuple[bool, str | None]:
-        """(bloccato, motivo): le impostazioni non si cambiano con una sync in corso o interrotta."""
+    def settings_locked(self) -> bool:
+        """Le impostazioni non si cambiano solo mentre una sync e' in esecuzione."""
         with self.mu:
             self.reconcile()
             active = self.st.active_run()
-            if active:
-                return True, ("in_corso" if active["status"] == IN_CORSO else "interrotta")
-            return False, None
+            return bool(active and active["status"] == IN_CORSO)
 
     def settings_view(self) -> dict:
-        locked, why = self.settings_lock()
         stored = self.st.settings_get()
         eff = self.effective_cfg()
         fields = []
@@ -104,14 +101,13 @@ class Manager:
                 "default": ",".join(d) if k == "countries" else d,
                 "sovrascritto": k in stored,
             })
-        return {"bloccato": locked, "motivo": why, "campi": fields}
+        return {"campi": fields}
 
     def save_settings(self, body: dict) -> tuple[int, dict]:
         """Salva i campi indicati. Esiti: (200, vista) | (409, ...) | (422, errori per campo)."""
         with self.mu:
-            locked, why = self.settings_lock()
-            if locked:
-                return 409, {"errore": self._lock_message(why), "motivo": why}
+            if self.settings_locked():
+                return 409, {"errore": self._LOCK_MSG}
             parsed, errs = {}, {}
             for k, raw in body.items():
                 try:
@@ -130,17 +126,12 @@ class Manager:
         with self.mu:
             if key not in sett.FIELDS:
                 return 404, {"errore": "impostazione sconosciuta"}
-            locked, why = self.settings_lock()
-            if locked:
-                return 409, {"errore": self._lock_message(why), "motivo": why}
+            if self.settings_locked():
+                return 409, {"errore": self._LOCK_MSG}
             self.st.settings_delete(key)
             return 200, self.settings_view()
 
-    @staticmethod
-    def _lock_message(why: str | None) -> str:
-        if why == "interrotta":
-            return "Sync interrotta: annullala per cambiare i filtri."
-        return "Sync in corso: le impostazioni non si possono cambiare."
+    _LOCK_MSG = "Sync in corso: impostazioni non disponibili."
 
     def _spawn(self, run_id: int):
         self.cfg.work_dir.mkdir(parents=True, exist_ok=True)

@@ -69,10 +69,10 @@ Solo variabili d'ambiente; l'elenco commentato e' in `docker/.env.example`. Ness
    `172.16.0.0/12` sono coperte dal default di `OFFCAT_API_ALLOW`. Con una subnet fuori da quel range, aggiungerla
    a `OFFCAT_API_ALLOW`.
 
-6. Dal pannello (sezione "Impostazioni") si cambiano anche `countries`, `kcal_min`, `kcal_max`, `coherence_pct`,
+6. Dalla pagina `/settings` del pannello (link "Impostazioni") si cambiano anche `countries`, `kcal_min`, `kcal_max`, `coherence_pct`,
    `coherence_abs`, `min_products`, `min_ratio`, `keep_work`. Precedenza: valore salvato dal pannello, poi variabile
    d'ambiente, poi default del codice; "Ripristina" cancella la modifica di un campo. Le modifiche sono bloccate
-   (409, pannello in sola lettura) con una sync in corso o interrotta in attesa di ripresa. Le impostazioni usate
+   solo mentre una sync e' in esecuzione (la pagina mostra un avviso, il salvataggio risponde 409). Le impostazioni usate
    da ogni sync sono nel campo `settings` di `GET /api/runs/<id>` e nella tabella `meta` del catalogo
    (`setting_*`; i paesi restano in `countries`). Tutti gli altri parametri restano solo da variabili d'ambiente.
 
