@@ -4,7 +4,7 @@ Colonne dell'export CSV di Open Food Facts usate (verificate sull'intestazione r
 code, countries_tags, product_name, (product_name_it se presente), brands, energy-kcal_100g, energy-kj_100g,
 energy_100g (kJ), fat_100g, saturated-fat_100g, carbohydrates_100g, sugars_100g, fiber_100g, proteins_100g,
 salt_100g, sodium_100g, alcohol_100g, serving_size, serving_quantity, nutriscore_grade, nova_group,
-last_modified_t.
+last_modified_t, (generic_name_it se presente), generic_name, quantity, categories, categories_tags.
 """
 from __future__ import annotations
 
@@ -21,7 +21,33 @@ NEEDED = (
     "energy-kj_100g", "energy_100g", "fat_100g", "saturated-fat_100g", "carbohydrates_100g",
     "sugars_100g", "fiber_100g", "proteins_100g", "salt_100g", "sodium_100g", "alcohol_100g",
     "serving_size", "serving_quantity", "nutriscore_grade", "nova_group", "last_modified_t",
+    "generic_name_it", "generic_name", "quantity", "categories", "categories_tags",
 )
+
+
+MAX_TEXT = 200
+
+
+def _text(s: str | None) -> str | None:
+    """Testo ripulito: spazi tolti, vuoto -> None, troncato a 200 caratteri."""
+    s = (s or "").strip()
+    return s[:MAX_TEXT].rstrip() or None
+
+
+def _category(categories: str, tags: str) -> str | None:
+    """Categoria piu' specifica: ultimo elemento non vuoto di `categories`, altrimenti ultimo tag leggibile."""
+    for part in reversed(categories.split(",")):
+        if part.strip():
+            return _text(part)
+    for part in reversed(tags.split(",")):
+        t = part.strip()
+        if not t:
+            continue
+        t = re.sub(r"^[a-z]{2,3}:", "", t, flags=re.IGNORECASE)
+        t = _text(t.replace("-", " "))
+        if t:
+            return t
+    return None
 
 
 def num(s: str | None) -> float | None:
@@ -111,6 +137,8 @@ class RowFilter:
         lm = num(g(row, "last_modified_t"))
         brand = g(row, "brands").split(",")[0].strip()
 
+        generic = _text(g(row, "generic_name_it")) or _text(g(row, "generic_name"))
+
         rec = (
             code, name, brand or None, kcal,
             _pct_value(g(row, "fat_100g")), _pct_value(g(row, "saturated-fat_100g")),
@@ -120,5 +148,6 @@ class RowFilter:
             grade if grade in ("a", "b", "c", "d", "e") else None,
             int(nova) if nova in (1, 2, 3, 4) else None,
             int(lm) if lm is not None else None,
+            generic, _text(g(row, "quantity")), _category(g(row, "categories"), g(row, "categories_tags")),
         )
         return rec, None

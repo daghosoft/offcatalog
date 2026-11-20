@@ -83,3 +83,36 @@ def test_sale_da_sodio_e_valori_non_noti(flt):
 def test_colonne_obbligatorie(tmp_path):
     with pytest.raises(ValueError):
         RowFilter(["code", "product_name"], Config(work_dir=tmp_path, output_dir=tmp_path))
+
+
+EXTRA = ["generic_name", "generic_name_it", "categories", "categories_tags"]
+
+
+def _extra(tmp_path, header=None, **kw):
+    header = header or HEADER + EXTRA
+    f = RowFilter(header, Config(work_dir=tmp_path, output_dir=tmp_path))
+    rec, reason = f.process(make_row(header, **kw).split("\t"))
+    assert reason is None
+    return rec
+
+
+def test_contesto_prodotto(tmp_path):
+    rec = _extra(tmp_path, generic_name="Generic EN", generic_name_it="Frollino al cacao",
+                 categories="Snack, Biscotti, Frollini al cacao ", categories_tags="en:snacks")
+    assert rec[16:] == ("Frollino al cacao", "300 g", "Frollini al cacao")
+    rec = _extra(tmp_path, generic_name="Generic EN", generic_name_it="")
+    assert rec[16] == "Generic EN"
+
+
+def test_categoria_ripiego_sui_tag(tmp_path):
+    rec = _extra(tmp_path, categories=" , ", categories_tags="en:snacks,it:pasta-di-semola,")
+    assert rec[18] == "pasta di semola"
+    rec = _extra(tmp_path, categories="", categories_tags="")
+    assert rec[16:] == (None, "300 g", None)
+
+
+def test_contesto_troncato_e_senza_colonne(tmp_path):
+    rec = _extra(tmp_path, generic_name="x" * 300)
+    assert len(rec[16]) == 200
+    rec = _extra(tmp_path, header=[c for c in HEADER if c != "quantity"])
+    assert rec[16:] == (None, None, None)

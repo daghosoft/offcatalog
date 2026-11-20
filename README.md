@@ -48,12 +48,16 @@ Esempio: `curl -fsS -X POST http://127.0.0.1:8080/api/sync`, poi interrogare `/a
 ## Schema del catalogo (`off_catalog.db`)
 1. `products`: `code` (PK), `name`, `brand`, `kcal_100g`, `fat_100g`, `saturated_fat_100g`, `carbs_100g`,
    `sugars_100g`, `fiber_100g`, `proteins_100g`, `salt_100g`, `serving_size`, `serving_g`, `nutriscore_grade`,
-   `nova_group`, `last_modified_t`.
-2. `products_fts`: FTS5 (tabella con contenuto esterno) su `name` e `brand`; si unisce a `products` con
+   `nova_group`, `last_modified_t`, `generic_name` (descrizione, da `generic_name_it` o `generic_name`),
+   `quantity` (formato confezione, es. "250 g"), `category` (categoria piu' specifica in testo leggibile, da
+   `categories` o, se vuota, da `categories_tags`). I tre campi sono testo nullable, al massimo 200 caratteri.
+2. `products_fts`: FTS5 (tabella con contenuto esterno) su `name`, `brand` e `generic_name`; si unisce a `products` con
    `products_fts.rowid = products.rowid`. Aprire il file in sola lettura e non eseguire `VACUUM`, che puo'
    rinumerare i rowid.
 3. `meta`: `schema_version`, `built_at`, `source_url`, `source_etag`, `source_last_modified`, `rows_read`,
    `products`, `scarti_*`, `countries`, `setting_*` (impostazioni di filtro e controllo usate), `offcatalog_version`, `attribution`. Chi legge controlla `schema_version`.
+4. `schema_version` 2 (rispetto alla 1): colonne `generic_name`, `quantity`, `category` in `products` e
+   `generic_name` indicizzato in `products_fts`. Chi legge la versione 1 non vede cambiare le colonne esistenti.
 
 ## Configurazione
 Solo variabili d'ambiente; l'elenco commentato e' in `docker/.env.example`. Nessun segreto nel repository.
@@ -69,7 +73,8 @@ Solo variabili d'ambiente; l'elenco commentato e' in `docker/.env.example`. Ness
    `172.16.0.0/12` sono coperte dal default di `OFFCAT_API_ALLOW`. Con una subnet fuori da quel range, aggiungerla
    a `OFFCAT_API_ALLOW`.
 
-6. Dalla pagina `/settings` del pannello (link "Impostazioni") si cambiano anche `countries`, `kcal_min`, `kcal_max`, `coherence_pct`,
+6. `OFFCAT_OUTPUT_NAME` (default `off_catalog.db`): nome del file catalogo generato, solo nome semplice che finisce in `.db`; serve a non sovrascrivere un catalogo in uso.
+7. Dalla pagina `/settings` del pannello (link "Impostazioni") si cambiano anche `countries`, `kcal_min`, `kcal_max`, `coherence_pct`,
    `coherence_abs`, `min_products`, `min_ratio`, `keep_work`. Precedenza: valore salvato dal pannello, poi variabile
    d'ambiente, poi default del codice; "Ripristina" cancella la modifica di un campo. Le modifiche sono bloccate
    solo mentre una sync e' in esecuzione (la pagina mostra un avviso, il salvataggio risponde 409). Le impostazioni usate

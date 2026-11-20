@@ -24,6 +24,7 @@ services:
       OFFCAT_MIN_PRODUCTS: ${OFFCAT_MIN_PRODUCTS:-100000}
       OFFCAT_SOURCE_URL: ${OFFCAT_SOURCE_URL:-https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz}
       OFFCAT_KEEP_WORK: ${OFFCAT_KEEP_WORK:-0}
+      OFFCAT_OUTPUT_NAME: ${OFFCAT_OUTPUT_NAME:-off_catalog.db}
     volumes:
       - ${OFFCAT_WORK_HOST_DIR:?impostare OFFCAT_WORK_HOST_DIR}:/data/work
       - ${OFFCAT_OUTPUT_HOST_DIR:?impostare OFFCAT_OUTPUT_HOST_DIR}:/data/output

@@ -34,7 +34,7 @@ def test_costruzione_da_csv_sintetico(make_cfg, csv_gz):
     builder.index(cfg, SRC, ctl)
     c = sqlite3.connect(cfg.build_db)
     meta = dict(c.execute("SELECT key, value FROM meta").fetchall())
-    assert meta["schema_version"] == "1" and meta["products"] == "40" and meta["rows_read"] == "49"
+    assert meta["schema_version"] == "2" and meta["products"] == "40" and meta["rows_read"] == "49"
     assert meta["source_etag"] == '"v1"' and meta["scarti_paese"] == "1" and "ODbL" in meta["attribution"]
     assert "_build_state" not in [r[0] for r in c.execute("SELECT name FROM sqlite_master")]
     # FTS: prefisso e senza accenti
@@ -143,3 +143,54 @@ def test_pubblicazione_atomica(make_cfg, csv_gz, monkeypatch):
     assert not (cfg.output_dir / "off_catalog.db.tmp").exists()
     assert builder.get_published(cfg)["prodotti"] == 40
     assert sqlite3.connect(cfg.output_db).execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+
+
+def test_schema_v2_contesto_e_fts_su_generic_name(make_cfg):
+    from conftest import HEADER, make_csv, make_row
+    header = HEADER + ["generic_name", "categories"]
+    text = make_csv([make_row(header, generic_name="Crema spalmabile alle nocciole", categories="Dolci, Creme")], header)
+    cfg = make_cfg(min_products=1)
+    setup_csv(cfg, text)
+    builder.build(cfg, SRC, 1, FakeCtl())
+    builder.index(cfg, SRC, FakeCtl())
+    c = sqlite3.connect(cfg.build_db)
+    assert c.execute("SELECT generic_name, quantity, category FROM products").fetchone() == (
+        "Crema spalmabile alle nocciole", "300 g", "Creme")
+    assert dict(c.execute("SELECT key, value FROM meta").fetchall())["schema_version"] == "2"
+    hit = c.execute("SELECT p.code FROM products_fts f JOIN products p ON p.rowid=f.rowid "
+                    "WHERE products_fts MATCH 'nocciol*'").fetchall()
+    assert len(hit) == 1
+    c.close()
+
+
+def test_nome_output_di_default(make_cfg):
+    cfg = make_cfg()
+    assert cfg.output_name == "off_catalog.db"
+    assert cfg.output_db == cfg.output_dir / "off_catalog.db"
+
+
+def test_nome_output_custom_da_env_e_to_env(tmp_path):
+    from offcatalog.config import Config
+    cfg = Config.from_env({"OFFCAT_OUTPUT_NAME": "off_catalog_v2.db", "OFFCAT_OUTPUT_DIR": str(tmp_path)})
+    assert cfg.output_db.name == "off_catalog_v2.db"
+    assert cfg.to_env()["OFFCAT_OUTPUT_NAME"] == "off_catalog_v2.db"
+
+
+def test_nome_output_custom_usato_dalla_pubblicazione(make_cfg, csv_gz):
+    _, text, _ = csv_gz
+    cfg = make_cfg().with_(output_name="off_catalog_v2.db")
+    setup_csv(cfg, text)
+    builder.build(cfg, SRC, 1, FakeCtl())
+    builder.index(cfg, SRC, FakeCtl())
+    builder.publish(cfg, FakeCtl())
+    assert (cfg.output_dir / "off_catalog_v2.db").exists()
+    assert not (cfg.output_dir / "off_catalog.db").exists()
+    assert not (cfg.output_dir / "off_catalog_v2.db.tmp").exists()
+    assert builder.get_published(cfg)["prodotti"] == 40
+
+
+@pytest.mark.parametrize("nome", ["../x.db", "a/b.db", "x.txt", "..db.db", "", "a b.db", "/etc/x.db"])
+def test_nome_output_non_valido_rifiutato(nome):
+    from offcatalog.config import Config
+    with pytest.raises(ValueError, match="OFFCAT_OUTPUT_NAME"):
+        Config.from_env({"OFFCAT_OUTPUT_NAME": nome})

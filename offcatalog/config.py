@@ -3,12 +3,24 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import re
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 DEFAULT_SOURCE_URL = "https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz"
 DEFAULT_API_ALLOW = "127.0.0.1,172.16.0.0/12"
 OUTPUT_NAME = "off_catalog.db"
+_OUTPUT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+\.db$")
+
+
+def validate_output_name(name: str) -> str:
+    """Solo un nome file semplice (niente percorsi), altrimenti errore chiaro."""
+    if not _OUTPUT_NAME_RE.match(name or "") or ".." in name:
+        raise ValueError(
+            f"OFFCAT_OUTPUT_NAME non valido ({name!r}): serve un nome file semplice che finisce in .db "
+            "(lettere, cifre, punto, trattino, underscore; niente / ne' ..)"
+        )
+    return name
 
 
 def _bool(v: str | None) -> bool:
@@ -47,6 +59,10 @@ class Config:
     download_retries: int = 5
     retry_base: float = 2.0
     runs_keep: int = 200
+    output_name: str = OUTPUT_NAME
+
+    def __post_init__(self):
+        validate_output_name(self.output_name)
 
     @property
     def state_db(self) -> Path:
@@ -86,7 +102,7 @@ class Config:
 
     @property
     def output_db(self) -> Path:
-        return self.output_dir / OUTPUT_NAME
+        return self.output_dir / self.output_name
 
     def networks(self):
         return parse_networks(self.api_allow)
@@ -99,6 +115,7 @@ class Config:
         return {
             "OFFCAT_WORK_DIR": str(self.work_dir),
             "OFFCAT_OUTPUT_DIR": str(self.output_dir),
+            "OFFCAT_OUTPUT_NAME": self.output_name,
             "OFFCAT_SOURCE_URL": self.source_url,
             "OFFCAT_COUNTRIES": ",".join(self.countries),
             "OFFCAT_MIN_PRODUCTS": str(self.min_products),
@@ -142,4 +159,5 @@ class Config:
             no_auth=_bool(e.get("OFFCAT_NO_AUTH")),
             keep_work=_bool(e.get("OFFCAT_KEEP_WORK")),
             nice=int(e.get("OFFCAT_NICE", "10")),
+            output_name=e.get("OFFCAT_OUTPUT_NAME", OUTPUT_NAME),
         )

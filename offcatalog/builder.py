@@ -30,7 +30,10 @@ CREATE TABLE IF NOT EXISTS products (
     serving_g REAL,
     nutriscore_grade TEXT,
     nova_group INTEGER,
-    last_modified_t INTEGER
+    last_modified_t INTEGER,
+    generic_name TEXT,
+    quantity TEXT,
+    category TEXT
 );
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS _build_state (
@@ -42,7 +45,7 @@ CREATE TABLE IF NOT EXISTS _build_state (
     scarti TEXT NOT NULL
 );
 """
-INSERT_SQL = "INSERT OR IGNORE INTO products VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+INSERT_SQL = "INSERT OR IGNORE INTO products VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
 
 
 def _connect(path) -> sqlite3.Connection:
@@ -173,7 +176,7 @@ def index(cfg: Config, src: dict, ctl) -> None:
     conn.execute("VACUUM")
     ctl.log("indice di testo FTS5")
     conn.execute(
-        "CREATE VIRTUAL TABLE products_fts USING fts5(name, brand, content='products', content_rowid='rowid',"
+        "CREATE VIRTUAL TABLE products_fts USING fts5(name, brand, generic_name, content='products', content_rowid='rowid',"
         " tokenize='unicode61 remove_diacritics 2', prefix='2 3')"
     )
     conn.execute("INSERT INTO products_fts(products_fts) VALUES ('rebuild')")
