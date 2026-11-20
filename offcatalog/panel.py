@@ -304,12 +304,21 @@ CATALOGO_CSS = """
 .pager .sp{flex:1}
 .cat-tbl{overflow-x:auto}
 .cat-tbl td.w{min-width:140px;max-width:280px}
+.cat-tbl td span[data-l]{display:block}
+.cat-tbl td .s{font-size:11px;color:var(--muted)}
+.cat-tbl th,.cat-tbl td{padding-left:8px;padding-right:8px}
+.cat-tbl th{white-space:normal;line-height:1.3}
+.cat-tbl th .s{display:block;font-size:10px;font-weight:500;letter-spacing:0}
+.cat-tbl td{white-space:normal}
+.cat-tbl td.mono{white-space:nowrap}
 @media (max-width:680px){
   .cat-tbl table,.cat-tbl thead,.cat-tbl tbody,.cat-tbl tr,.cat-tbl td{display:block;width:100%}
   .cat-tbl thead{display:none}
   .cat-tbl tr{padding:10px 12px;border-bottom:1px solid var(--border)}
   .cat-tbl td{border:0;padding:1px 0;white-space:normal;overflow-wrap:anywhere}
   .cat-tbl td[data-l]::before{content:attr(data-l) ": ";color:var(--muted);font-size:12px}
+  .cat-tbl td span[data-l]::before{content:attr(data-l) ": ";color:var(--muted);font-size:12px}
+  .cat-tbl td .s{font-size:inherit}
   .cat-tbl td.t{font-weight:600;font-size:14px}
   .cat-tbl td.t::before{content:none}
 }
@@ -326,11 +335,24 @@ CATALOGO_HTML = (_PAGE_HEAD + _topbar("catalogo") + """
 <script>
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ET={code:'Codice',name:'Nome',brand:'Marca',generic_name:'Descrizione',quantity:'Formato',category:'Categoria',kcal_100g:'kcal/100g',
+const ET={code:'Codice',name:'Nome',brand:'Marca',generic_name:'Descrizione',quantity:'Formato',category:'Categoria',kcal_100g:'Kcal',
   fat_100g:'Grassi',saturated_fat_100g:'Saturi',carbs_100g:'Carboidrati',sugars_100g:'Zuccheri',fiber_100g:'Fibre',proteins_100g:'Proteine',salt_100g:'Sale'};
 const NUMC=new Set(['kcal_100g','fat_100g','saturated_fat_100g','carbs_100g','sugars_100g','fiber_100g','proteins_100g','salt_100g']);
+const GRUPPI=[{a:'fat_100g',b:'saturated_fat_100g',h:['Grassi','saturi']},{a:'carbs_100g',b:'sugars_100g',h:['Carboidrati','zuccheri']}];
 const nf=n=>n==null?'-':Number(n).toLocaleString('it-IT',{maximumFractionDigits:2});
 const DT=s=>{if(!s)return '-';const t=new Date(s);return isNaN(t)?esc(s):t.toLocaleString('it-IT')};
+function colonneVisibili(cs){const out=[];
+  cs.forEach(c=>{const g=GRUPPI.find(x=>x.a===c&&cs.includes(x.b));
+    if(g)out.push({g});else if(!GRUPPI.some(x=>x.b===c&&cs.includes(x.a)))out.push({c})});
+  return out}
+function cella(r,c){
+  const v=r[c],cl=NUMC.has(c)?'n':(c==='name'||c==='generic_name'||c==='category'||c==='brand')?'w':'';
+  const t=c==='name'?' t':'';
+  return '<td class="'+cl+t+(c==='code'?' mono':'')+'"'+(c==='name'?'':' data-l="'+esc(ET[c]||c)+'"')+(NUMC.has(c)?' style="text-align:right"':'')+'>'
+    +(NUMC.has(c)?esc(nf(v)):esc(v==null||v===''?'-':v))+'</td>'}
+function cellaGruppo(r,g){
+  const riga=(c,cls)=>'<span'+(cls?' class="'+cls+'"':'')+' data-l="'+esc(ET[c])+'">'+esc(nf(r[c]))+'</span>';
+  return '<td class="n" style="text-align:right">'+riga(g.a)+riga(g.b,'s')+'</td>'}
 let pagina=1,seq=0,timer=null,last={q:null,p:null};
 const u=new URLSearchParams(location.search);
 $('q').value=u.get('q')||'';pagina=Math.max(1,parseInt(u.get('pagina')||'1',10)||1);
@@ -350,17 +372,14 @@ async function carica(){
     return;
   }
   const i=j.info;
-  $('info').innerHTML='<span>File: <b>'+esc(i.file)+'</b></span><span>Schema: <b>'+esc(i.schema)+'</b></span><span>Prodotti: <b>'+nf(i.prodotti)+'</b></span><span>Data: <b>'+DT(i.data)+'</b></span>';
+  $('info').innerHTML='<span>File: <b>'+esc(i.file)+'</b></span><span>Schema: <b>'+esc(i.schema)+'</b></span><span>Prodotti: <b>'+nf(i.prodotti)+'</b></span><span>Data: <b>'+DT(i.data)+'</b></span><span>Valori: <b>per 100 g</b></span>';
   $('tot').textContent=j.q?nf(j.totale)+' risultati':nf(j.totale)+' prodotti';
   if(!j.righe.length){$('res').innerHTML='<div class="body empty">Nessun risultato.</div>'}
   else{
-    const cs=j.colonne;
-    $('res').innerHTML='<table><thead><tr>'+cs.map(c=>'<th'+(NUMC.has(c)?' style="text-align:right"':'')+'>'+esc(ET[c]||c)+'</th>').join('')+'</tr></thead><tbody>'
-      +j.righe.map(r=>'<tr>'+cs.map(c=>{
-        const v=r[c],cl=NUMC.has(c)?'n':(c==='name'||c==='generic_name'||c==='category'||c==='brand')?'w':'';
-        const t=c==='name'?' t':'';
-        return '<td class="'+cl+t+(c==='code'?' mono':'')+'"'+(c==='name'?'':' data-l="'+esc(ET[c]||c)+'"')+(NUMC.has(c)?' style="text-align:right"':'')+'>'
-          +(NUMC.has(c)?nf(v):esc(v==null||v===''?'-':v))+'</td>'}).join('')+'</tr>').join('')+'</tbody></table>';
+    const cols=colonneVisibili(j.colonne);
+    const th=(t,c)=>'<th'+(NUMC.has(c)?' style="text-align:right"':'')+'>'+(Array.isArray(t)?esc(t[0])+'<span class="s">'+esc(t[1])+'</span>':esc(t))+'</th>';
+    $('res').innerHTML='<table><thead><tr>'+cols.map(x=>x.g?th(x.g.h,x.g.a):th(ET[x.c]||x.c,x.c)).join('')+'</tr></thead><tbody>'
+      +j.righe.map(r=>'<tr>'+cols.map(x=>x.g?cellaGruppo(r,x.g):cella(r,x.c)).join('')+'</tr>').join('')+'</tbody></table>';
   }
   $('pg').textContent='Pagina '+nf(j.pagina)+' di '+nf(j.pagine);
   $('prev').disabled=j.pagina<=1;$('next').disabled=j.pagina>=j.pagine;
