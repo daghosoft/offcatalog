@@ -157,7 +157,7 @@ class Manager:
                 esito = "gia_in_corso" if active["status"] == IN_CORSO else "interrotta"
                 return esito, active["id"], json.loads(active["source"] or "{}")
             src = source.head_safe(self.cfg)
-            if not force and unchanged(src, builder.get_published(self.cfg)):
+            if not force and unchanged(src, builder.get_published(self.effective_cfg())):
                 rid = self.st.create_run(origin, force, status=NESSUNA_NOVITA, source=src)
                 self.st.log(rid, "export invariato: nessuna novita'")
                 return "nessuna_novita", rid, src
@@ -217,7 +217,7 @@ class Manager:
                 "last_modified": src.get("last_modified"), "dimensione": src.get("size")}
 
     def published_view(self) -> dict:
-        pub = builder.get_published(self.cfg)
+        pub = builder.get_published(self.effective_cfg())
         if not pub:
             return {"data": None, "prodotti": None, "dimensione": None, "data_export": None}
         return {k: pub[k] for k in ("data", "prodotti", "dimensione", "data_export")}

@@ -62,6 +62,12 @@ def test_precedenza_override_env_default(tmp_path):
     ({"countries": "italy"}, "countries"),
     ({"countries": "en:Italy!"}, "countries"),
     ({"keep_work": "boh"}, "keep_work"),
+    ({"output_name": "../x.db"}, "output_name"),
+    ({"output_name": "a/b.db"}, "output_name"),
+    ({"output_name": "x.txt"}, "output_name"),
+    ({"output_name": ""}, "output_name"),
+    ({"output_name": "a b.db"}, "output_name"),
+    ({"output_name": 5}, "output_name"),
     ({"kcal_min": "abc"}, "kcal_min"),
     ({"source_url": "http://x"}, "source_url"),
     ({"password": "x"}, "password"),
@@ -135,3 +141,30 @@ def test_settings_nel_run_e_nel_meta(env):
     assert meta["setting_kcal_min"] == "1.0" and meta["setting_min_products"] == "10"
     assert meta["countries"] == "en:italy" and "setting_countries" not in meta
     assert meta["schema_version"]
+
+
+def test_output_name_precedenza_e_pubblicazione(source_factory, make_cfg, csv_gz):
+    src = source_factory(csv_gz[0])
+    cfg = make_cfg(src.url, no_auth=False, panel_user="admin", panel_password="changeme").with_(
+        output_name="da_env.db")
+    app = create_app(cfg)
+    c = TestClient(app, client=("198.51.100.1", 1))
+    mgr = app.state.manager
+    assert mgr.effective_cfg().output_name == "da_env.db"                    # env > default
+    assert post(c, {"output_name": " dal_pannello.db "}).status_code == 200
+    assert mgr.effective_cfg().output_name == "dal_pannello.db"              # pannello > env
+    f = campo(c, "output_name")
+    assert f["valore"] == "dal_pannello.db" and f["default"] == "da_env.db" and f["sovrascritto"] is True
+    local = TestClient(app, client=LOCAL)
+    run = wait_done(local, local.post("/api/sync").json()["run_id"])
+    assert run["stato"] == "completata", run
+    assert (cfg.output_dir / "dal_pannello.db").exists() and not (cfg.output_dir / "da_env.db").exists()
+    assert run["settings"]["output_name"] == "dal_pannello.db"
+    assert local.get("/api/status").json()["catalogo_pubblicato"]["prodotti"] == 40   # nome effettivo
+    conn = sqlite3.connect(cfg.output_dir / "dal_pannello.db")
+    meta = dict(conn.execute("SELECT key, value FROM meta").fetchall())
+    conn.close()
+    assert "setting_output_name" not in meta
+    assert c.post("/panel/settings/reset/output_name", headers=H, auth=AUTH).status_code == 200
+    assert mgr.effective_cfg().output_name == "da_env.db"                    # reset: torna all'env
+    assert local.get("/api/status").json()["catalogo_pubblicato"]["prodotti"] is None

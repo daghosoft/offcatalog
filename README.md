@@ -75,7 +75,9 @@ Solo variabili d'ambiente; l'elenco commentato e' in `docker/.env.example`. Ness
 
 6. `OFFCAT_OUTPUT_NAME` (default `off_catalog.db`): nome del file catalogo generato, solo nome semplice che finisce in `.db`; serve a non sovrascrivere un catalogo in uso.
 7. Dalla pagina `/settings` del pannello (link "Impostazioni") si cambiano anche `countries`, `kcal_min`, `kcal_max`, `coherence_pct`,
-   `coherence_abs`, `min_products`, `min_ratio`, `keep_work`. Precedenza: valore salvato dal pannello, poi variabile
+   `coherence_abs`, `min_products`, `min_ratio`, `keep_work` e `output_name` (nome del file catalogo, lo stesso di
+   `OFFCAT_OUTPUT_NAME`: vale dalla prossima sync, il file precedente resta dov'e'; i controlli di pubblicazione e lo
+   stato del catalogo pubblicato usano il nome effettivo). Precedenza: valore salvato dal pannello, poi variabile
    d'ambiente, poi default del codice; "Ripristina" cancella la modifica di un campo. Le modifiche sono bloccate
    solo mentre una sync e' in esecuzione (la pagina mostra un avviso, il salvataggio risponde 409). Le impostazioni usate
    da ogni sync sono nel campo `settings` di `GET /api/runs/<id>` e nella tabella `meta` del catalogo

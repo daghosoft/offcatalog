@@ -8,13 +8,19 @@ from __future__ import annotations
 import math
 import re
 
-from .config import Config
+from .config import Config, validate_output_name
 
 COUNTRY_RE = re.compile(r"^[a-z0-9_-]+:[a-z0-9_-]+$")
 KCAL_MAX_LIMITE = 2000
 
 # ordine di visualizzazione; "tipo": testo | numero | intero | bool
 FIELDS = {
+    "output_name": {
+        "tipo": "testo", "etichetta": "Nome del catalogo generato",
+        "descrizione": "Nome del file SQLite pubblicato nella cartella di output (solo lettere, numeri, punto, "
+                       "trattino, underscore; deve finire con .db). Vale dalla prossima sync; il file "
+                       "precedente resta dov'e'.",
+    },
     "countries": {
         "tipo": "testo", "etichetta": "Paesi",
         "descrizione": "Paesi da tenere, separati da virgola (formato en:italy). Un prodotto entra se e' "
@@ -53,8 +59,8 @@ FIELDS = {
     },
 }
 KEYS = tuple(FIELDS)
-# chiavi che finiscono nella tabella meta del catalogo (countries c'e' gia' come `countries`)
-META_KEYS = tuple(k for k in KEYS if k != "countries")
+# chiavi che finiscono nella tabella meta del catalogo (countries c'e' gia' come `countries`; output_name e' il nome del file stesso)
+META_KEYS = tuple(k for k in KEYS if k not in ("countries", "output_name"))
 
 
 def _number(raw, key: str) -> float:
@@ -97,6 +103,14 @@ def parse_value(key: str, raw):
             if c not in out:
                 out.append(c)
         return tuple(out)
+    if key == "output_name":
+        if not isinstance(raw, str):
+            raise ValueError("deve essere un nome file")
+        try:
+            return validate_output_name(raw.strip())
+        except ValueError:
+            raise ValueError("nome non valido: solo lettere, numeri, punto, trattino e underscore, "
+                             "deve finire con .db (niente percorsi)") from None
     if tipo == "bool":
         if isinstance(raw, bool):
             return raw
