@@ -84,6 +84,13 @@ input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
 .ov{color:var(--warn);font-weight:600}
 .errc{color:var(--danger);font-size:12px}
 .campo button{height:30px;padding:0 10px;margin-top:6px;font-size:12px}
+.setsum{margin-top:8px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.setsum .hd{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.setsum h3{margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.setsum .lst{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:2px 16px}
+.setsum .lst>div{overflow-wrap:anywhere;min-width:0}
+.setsum .lst b{font-weight:500;color:var(--text);font-variant-numeric:tabular-nums}
+.setsum .ovd{color:var(--warn)}
 .bar2{display:flex;align-items:center;gap:12px;margin-top:14px}
 @media (max-width:680px){
   .kv{grid-template-columns:1fr;gap:0}
@@ -124,6 +131,7 @@ PANEL_HTML = (_PAGE_HEAD + """<div class="topbar"><div class="in"><h1>offcatalog
 <div id="msg" aria-live="polite"></div></div></div>
 <div class="card"><h2>Log</h2><div class="body"><pre class="mono" id="log" tabindex="0"></pre></div></div>
 <div class="card"><h2>Storico (ultime 20)</h2><div class="tbl" id="hist"></div></div>
+<div class="setsum" id="setsum" hidden><div class="hd"><h3>Impostazioni</h3><a href="/settings">Modifica</a></div><div class="lst" id="setlst"></div></div>
 </main>
 <script>
 const $=id=>document.getElementById(id);
@@ -198,7 +206,17 @@ function render(d){
 async function refresh(){
   try{const r=await fetch('/panel/data');if(r.ok)render(await r.json())}catch(e){}
 }
-refresh();setInterval(refresh,2000);
+async function riepilogo(){
+  try{
+    const r=await fetch('/panel/settings');if(!r.ok)return;
+    const v=await r.json();if(!v.campi||!v.campi.length)return;
+    const fmt=f=>f.tipo==='bool'?(f.valore?'si':'no'):Array.isArray(f.valore)?f.valore.join(', '):f.valore;
+    $('setlst').innerHTML=v.campi.map(f=>'<div>'+esc(f.etichetta)+': <b>'+esc(fmt(f))+'</b>'
+      +(f.sovrascritto?' <span class="ovd">&#9679; pannello</span>':'')+'</div>').join('');
+    $('setsum').hidden=false;
+  }catch(e){}
+}
+refresh();setInterval(refresh,2000);riepilogo();
 </script></body></html>
 """).replace("@@CSS@@", PANEL_CSS)
 

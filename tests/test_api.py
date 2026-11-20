@@ -185,3 +185,11 @@ def test_panel_data_tz(env, monkeypatch):
     assert p.get("/panel/data", auth=a).json()["tz"] == "UTC"
     monkeypatch.delenv("TZ")
     assert p.get("/panel/data", auth=a).json()["tz"] == "UTC"
+
+
+def test_home_riepilogo_impostazioni(env):
+    cfg, app, src = env
+    c = TestClient(app, client=("198.51.100.1", 1))
+    html = c.get("/", auth=("admin", "changeme")).text
+    assert 'id="setsum"' in html and 'href="/settings"' in html and "/panel/settings" in html
+    assert html.index('id="setsum"') > html.index("Storico (ultime 20)")
