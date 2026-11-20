@@ -16,6 +16,7 @@ a{color:var(--accent)}
 .topbar{background:var(--bar);color:var(--bar-text);border-bottom:1px solid var(--border)}
 .topbar .in{max-width:1200px;margin:0 auto;padding:0 16px;height:52px;display:flex;align-items:center;gap:14px}
 .topbar h1{font-size:16px;font-weight:600;margin:0;letter-spacing:.01em}
+.topbar h1 a{color:inherit;text-decoration:none}
 .topbar small{color:var(--faint);font-weight:500;margin-left:6px}
 .topbar .sp{flex:1}
 .toplink{color:var(--bar-text);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:6px}
@@ -111,7 +112,7 @@ _PAGE_HEAD = """<!doctype html>
 <style>
 @@CSS@@</style></head><body>"""
 
-PANEL_HTML = (_PAGE_HEAD + """<div class="topbar"><div class="in"><h1>offcatalog<small id="ver"></small></h1><span class="sp"></span>
+PANEL_HTML = (_PAGE_HEAD + """<div class="topbar"><div class="in"><h1><a href="/" aria-label="Torna alla dashboard">offcatalog</a><small id="ver"></small></h1><span class="sp"></span>
 <a class="toplink" href="/settings">Impostazioni</a></div></div>
 <main>
 <div class="grid2">
@@ -220,7 +221,7 @@ refresh();setInterval(refresh,2000);riepilogo();
 </script></body></html>
 """).replace("@@CSS@@", PANEL_CSS)
 
-_TOP_SET = """<div class="topbar"><div class="in"><h1>offcatalog<small>Impostazioni</small></h1><span class="sp"></span>
+_TOP_SET = """<div class="topbar"><div class="in"><h1><a href="/" aria-label="Torna alla dashboard">offcatalog</a><small>Impostazioni</small></h1><span class="sp"></span>
 <a class="toplink" href="/">Torna al pannello</a></div></div>"""
 
 SETTINGS_LOCKED_HTML = (_PAGE_HEAD + _TOP_SET + """

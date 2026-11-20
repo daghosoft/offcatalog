@@ -193,3 +193,10 @@ def test_home_riepilogo_impostazioni(env):
     html = c.get("/", auth=("admin", "changeme")).text
     assert 'id="setsum"' in html and 'href="/settings"' in html and "/panel/settings" in html
     assert html.index('id="setsum"') > html.index("Storico (ultime 20)")
+
+
+def test_topbar_link_home_e_impostazioni(env):
+    cfg, app, src = env
+    c = TestClient(app, client=("198.51.100.1", 1))
+    link = '<h1><a href="/" aria-label="Torna alla dashboard">offcatalog</a>'
+    assert link in c.get("/", auth=("admin", "changeme")).text and link in c.get("/settings", auth=("admin", "changeme")).text
