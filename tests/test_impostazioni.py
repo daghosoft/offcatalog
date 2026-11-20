@@ -101,7 +101,7 @@ def test_corpo_e_autenticazione(env):
 def test_blocco_solo_con_sync_in_corso(env):
     cfg, app, c = env
     mgr = app.state.manager
-    assert "Torna al pannello" in c.get("/settings", auth=AUTH).text and 'id="setsave"' in c.get("/settings", auth=AUTH).text
+    assert 'id="setsave"' in c.get("/settings", auth=AUTH).text
     assert c.get("/settings").status_code == 401
     mgr.st.create_run("pannello", False)                   # "in corso" (nessun processo: lo teniamo vivo col lock)
     mgr._spawn_ts = __import__("time").time()
@@ -109,7 +109,7 @@ def test_blocco_solo_con_sync_in_corso(env):
     assert r.status_code == 409 and "in corso" in r.json()["errore"]
     assert c.post("/panel/settings/reset/kcal_min", headers=H, auth=AUTH).status_code == 409
     page = c.get("/settings", auth=AUTH).text
-    assert "Sync in corso: impostazioni non disponibili" in page and "Torna al pannello" in page
+    assert "Sync in corso: impostazioni non disponibili" in page
     assert 'id="setsave"' not in page
     assert "impostazioni_blocco" not in c.get("/panel/data", auth=AUTH).json()
 

@@ -82,6 +82,11 @@ Solo variabili d'ambiente; l'elenco commentato e' in `docker/.env.example`. Ness
    solo mentre una sync e' in esecuzione (la pagina mostra un avviso, il salvataggio risponde 409). Le impostazioni usate
    da ogni sync sono nel campo `settings` di `GET /api/runs/<id>` e nella tabella `meta` del catalogo
    (`setting_*`; i paesi restano in `countries`). Tutti gli altri parametri restano solo da variabili d'ambiente.
+8. Il pannello ha tre schede in alto: Dashboard (`/`), Catalogo (`/catalogo`) e Impostazioni (`/settings`). La scheda Catalogo
+   sfoglia il catalogo pubblicato (il file col nome effettivo) in sola lettura, 50 righe per pagina: senza testo elenca per
+   nome; 8-14 cifre cercano il codice a barre esatto; altro testo cerca per nome, marca e descrizione (prefisso sull'ultima
+   parola). Lo stato e' nell'indirizzo (`?q=&pagina=`). I dati vengono da `GET /panel/catalogo?q=&pagina=` (stessa
+   autenticazione del pannello); la sync in corso non viene toccata.
 
 Il pannello e le API sono in HTTP semplice: la password Basic viaggia in chiaro. Non esporre la porta al mondo:
 limitarla con il firewall agli indirizzi di chi gestisce il servizio.

@@ -14,7 +14,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from . import __version__
 from .config import Config
 from .manager import Manager, iso
-from .panel import PANEL_HTML, SETTINGS_HTML, SETTINGS_LOCKED_HTML
+from . import browse
+from .panel import CATALOGO_HTML, PANEL_HTML, SETTINGS_HTML, SETTINGS_LOCKED_HTML
 
 def server_tz() -> str:
     """Nome IANA del fuso del server (variabile TZ); UTC se assente o non valido."""
@@ -127,6 +128,19 @@ def create_app(cfg: Config | None = None, manager: Manager | None = None) -> Fas
         if last:
             log = [{"ts": iso(r["ts"]), "line": r["line"]} for r in mgr.st.log_tail(last["run_id"], 60)]
         return {"versione": __version__, "tz": server_tz(), "stato": status, "storico": mgr.history_view(20), "log": log}
+
+    @app.get("/catalogo", response_class=HTMLResponse)
+    def catalogo_page(request: Request):
+        if not panel_ok(request):
+            return unauthorized()
+        return HTMLResponse(CATALOGO_HTML)
+
+    @app.get("/panel/catalogo")
+    def panel_catalogo(request: Request, q: str = "", pagina: int = 1):
+        if not panel_ok(request):
+            return unauthorized()
+        code, out = browse.search(mgr.effective_cfg().output_db, q, pagina)
+        return JSONResponse(out, status_code=code)
 
     @app.get("/settings", response_class=HTMLResponse)
     def settings_page(request: Request):
